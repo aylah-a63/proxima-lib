@@ -18,3 +18,6 @@ proxima-lib = "proxima_lib.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["proxima_lib"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

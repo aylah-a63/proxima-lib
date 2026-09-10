@@ -60,4 +60,4 @@ def parse_per_file(path: Path) -> PersonaFile:
 
 
 def validate_safety_block(system_prompt: str) -> bool:
-    return system_prompt.strip().startswith(SAFETY_BLOCK)
+    return system_prompt.startswith(SAFETY_BLOCK)

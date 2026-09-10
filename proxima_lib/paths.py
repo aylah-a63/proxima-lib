@@ -7,7 +7,8 @@ def config_dir() -> Path:
         p = Path.home() / "Library" / "Application Support" / "proxima"
     elif sys.platform == "win32":
         import os
-        p = Path(os.environ["APPDATA"]) / "proxima"
+        appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        p = Path(appdata) / "proxima"
     else:
         p = Path.home() / ".config" / "proxima"
     p.mkdir(parents=True, exist_ok=True)
@@ -19,7 +20,8 @@ def data_dir() -> Path:
         p = Path.home() / "Library" / "Application Support" / "proxima"
     elif sys.platform == "win32":
         import os
-        p = Path(os.environ["APPDATA"]) / "proxima"
+        appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        p = Path(appdata) / "proxima"
     else:
         p = Path.home() / ".local" / "share" / "proxima"
     p.mkdir(parents=True, exist_ok=True)

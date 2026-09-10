@@ -1,7 +1,5 @@
 from proxima_lib.config import Config, save_config, load_config
-import tempfile, os
 from unittest.mock import patch
-from pathlib import Path
 
 
 def test_config_roundtrip(tmp_path):

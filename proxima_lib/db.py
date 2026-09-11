@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 import aiosqlite
@@ -24,6 +25,7 @@ class Database:
     def __init__(self, conn: aiosqlite.Connection):
         self._conn = conn
         self._conn.row_factory = aiosqlite.Row
+        self._lock = asyncio.Lock()
 
     @classmethod
     async def create(cls) -> "Database":
@@ -48,22 +50,24 @@ class Database:
         prompt_content: str,
         timestamp: str,
     ) -> None:
-        await self._conn.execute(
-            """INSERT OR IGNORE INTO messages
-               (message_id, channel_id, user_id, username, nickname,
-                message_content, prompt_content, timestamp)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (message_id, channel_id, user_id, username, nickname,
-             message_content, prompt_content, timestamp),
-        )
-        await self._conn.commit()
+        async with self._lock:
+            await self._conn.execute(
+                """INSERT OR IGNORE INTO messages
+                   (message_id, channel_id, user_id, username, nickname,
+                    message_content, prompt_content, timestamp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (message_id, channel_id, user_id, username, nickname,
+                 message_content, prompt_content, timestamp),
+            )
+            await self._conn.commit()
 
     async def mark_deleted(self, message_id: str) -> None:
-        await self._conn.execute(
-            "UPDATE messages SET deleted = 1 WHERE message_id = ?",
-            (message_id,),
-        )
-        await self._conn.commit()
+        async with self._lock:
+            await self._conn.execute(
+                "UPDATE messages SET deleted = 1 WHERE message_id = ?",
+                (message_id,),
+            )
+            await self._conn.commit()
 
     async def fetch_all(self, query: str, params: tuple = ()) -> list[aiosqlite.Row]:
         cursor = await self._conn.execute(query, params)

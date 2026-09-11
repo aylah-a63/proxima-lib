@@ -14,6 +14,6 @@ class OllamaClient:
                 f"Ollama is not reachable at {self._host} — is it running? ({e})"
             ) from e
 
-    async def generate(self, model: str, user_message: str) -> str:
-        response = await self._client.generate(model=model, prompt=user_message)
+    async def generate(self, model: str, user_message: str, system: str | None = None) -> str:
+        response = await self._client.generate(model=model, prompt=user_message, system=system)
         return response.response

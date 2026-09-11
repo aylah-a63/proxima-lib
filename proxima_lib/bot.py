@@ -1,21 +1,24 @@
 import os
+import sys
 import asyncio
 import discord
 from datetime import datetime, timezone
 from proxima_lib.config import load_config
 from proxima_lib.db import Database
 from proxima_lib.ollama_client import OllamaClient
+from proxima_lib.paths import personas_dir
+from proxima_lib.persona import PersonaFile, parse_per_file, validate_safety_block
 from proxima_lib.router import Router
 
 
 class BotInstance(discord.Client):
-    def __init__(self, token: str, personas: list[str], router: Router,
+    def __init__(self, token: str, personas: dict[str, PersonaFile], router: Router,
                  ollama: OllamaClient, db: Database, config):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(intents=intents)
         self._token = token
-        self._personas = set(personas)
+        self._personas = personas
         self._router = router
         self._ollama = ollama
         self._db = db
@@ -33,15 +36,18 @@ class BotInstance(discord.Client):
             await message.channel.send(self._config.default_reject_message)
             return
         if persona not in self._personas:
-            print(f"[proxima] channel {channel_id} routed to '{persona}' but this instance owns {self._personas} — skipping")
+            print(f"[proxima] channel {channel_id} routed to '{persona}' but this instance owns {set(self._personas)} — skipping")
             return
 
+        persona_file = self._personas[persona]
         try:
             response = await self._ollama.generate(
                 model=persona,
                 user_message=message.content,
+                system=persona_file.system_prompt,
             )
-        except Exception:
+        except Exception as e:
+            print(f"[OLLAMA_UNAVAILABLE] {e}", file=sys.stderr)
             response = self._config.ollama_error_message
             prompt_content = "[OLLAMA_UNAVAILABLE]"
         else:
@@ -73,22 +79,34 @@ async def run() -> None:
     await ollama.health_check()
     router = Router(config)
 
+    # Load and validate every active persona's .per file.
+    pdir = personas_dir()
+    all_personas: dict[str, PersonaFile] = {}
+    for name in config.active_personas:
+        per_path = pdir / f"{name}.per"
+        if not per_path.exists():
+            raise RuntimeError(f"Persona file not found: {per_path}")
+        pf = parse_per_file(per_path)
+        if not validate_safety_block(pf.system_prompt):
+            raise RuntimeError(f"Persona '{name}' missing required safety block — re-register with `proxima-sh persona create`")
+        all_personas[name] = pf
+
     # Group personas by their token env var.
     # persona_tokens maps persona_name -> keychain entry name;
     # proxima-sh injects PROXIMA_TOKEN_<NAME> or DISCORD_TOKEN.
-    token_to_personas: dict[str, list[str]] = {}
-    for persona in config.active_personas:
-        token_key = config.persona_tokens.get(persona)
+    token_to_personas: dict[str, dict[str, PersonaFile]] = {}
+    for name, pf in all_personas.items():
+        token_key = config.persona_tokens.get(name)
         if token_key:
             env_var = f"PROXIMA_TOKEN_{token_key.upper()}"
             token = os.environ.get(env_var)
             if not token:
-                raise RuntimeError(f"Expected env var {env_var} for persona '{persona}'")
+                raise RuntimeError(f"Expected env var {env_var} for persona '{name}'")
         else:
             token = os.environ.get("DISCORD_TOKEN")
             if not token:
                 raise RuntimeError("Expected env var DISCORD_TOKEN")
-        token_to_personas.setdefault(token, []).append(persona)
+        token_to_personas.setdefault(token, {})[name] = pf
 
     bots = [
         BotInstance(token, personas, router, ollama, db, config)

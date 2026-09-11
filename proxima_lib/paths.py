@@ -15,6 +15,12 @@ def config_dir() -> Path:
     return p
 
 
+def personas_dir() -> Path:
+    p = config_dir() / "personas"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
 def data_dir() -> Path:
     if sys.platform == "darwin":
         p = Path.home() / "Library" / "Application Support" / "proxima"

@@ -6,7 +6,6 @@ from proxima_lib.config import load_config
 from proxima_lib.db import Database
 from proxima_lib.ollama_client import OllamaClient
 from proxima_lib.router import Router
-from proxima_lib.paths import data_dir
 
 
 class BotInstance(discord.Client):
@@ -30,9 +29,11 @@ class BotInstance(discord.Client):
             return
         channel_id = str(message.channel.id)
         persona = self._router.route(channel_id)
-        if persona is None or persona not in self._personas:
-            if persona is None:
-                await message.channel.send(self._config.default_reject_message)
+        if persona is None:
+            await message.channel.send(self._config.default_reject_message)
+            return
+        if persona not in self._personas:
+            print(f"[proxima] channel {channel_id} routed to '{persona}' but this instance owns {self._personas} — skipping")
             return
 
         try:

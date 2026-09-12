@@ -12,6 +12,8 @@ class Config:
     active_personas: list[str] = field(default_factory=list)
     channels: dict[str, str] = field(default_factory=dict)
     persona_tokens: dict[str, str] = field(default_factory=dict)
+    allowed_guilds: list[str] = field(default_factory=list)
+    allowed_channels: list[str] = field(default_factory=list)
 
 
 def load_config() -> Config:
@@ -28,6 +30,8 @@ def load_config() -> Config:
         active_personas=data.get("personas", {}).get("active", []),
         channels=data.get("channels", {}),
         persona_tokens=data.get("persona_tokens", {}),
+        allowed_guilds=data.get("whitelist", {}).get("guilds", []),
+        allowed_channels=data.get("whitelist", {}).get("channels", []),
     )
 
 
@@ -42,6 +46,10 @@ def save_config(config: Config) -> None:
         "personas": {"active": config.active_personas},
         "channels": config.channels,
         "persona_tokens": config.persona_tokens,
+        "whitelist": {
+            "guilds": config.allowed_guilds,
+            "channels": config.allowed_channels,
+        },
     }
     with open(path, "wb") as f:
         tomli_w.dump(data, f)

@@ -30,7 +30,12 @@ class BotInstance(discord.Client):
     async def on_message(self, message: discord.Message):
         if message.author == self.user:
             return
+        guild_id = str(message.guild.id) if message.guild else None
+        if self._config.allowed_guilds and guild_id not in self._config.allowed_guilds:
+            return
         channel_id = str(message.channel.id)
+        if self._config.allowed_channels and channel_id not in self._config.allowed_channels:
+            return
         persona = self._router.route(channel_id)
         if persona is None:
             await message.channel.send(self._config.default_reject_message)

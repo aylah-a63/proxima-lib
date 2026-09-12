@@ -28,24 +28,32 @@ def parse_per_file(path: Path) -> PersonaFile:
     in_system = False
     for line in text.splitlines():
         stripped = line.strip()
-        if stripped.upper().startswith("FROM "):
-            from_model = stripped[5:].strip()
-        elif stripped.upper().startswith("TOKEN_NAME "):
-            token_name = stripped[11:].strip()
-        elif stripped.upper().startswith('SYSTEM """'):
-            in_system = True
-            rest = stripped[10:]
-            if rest:
-                system_lines.append(rest)
-        elif in_system:
-            if stripped == '"""':
+        parts = stripped.split(None, 1)
+        directive = parts[0].upper() if parts else ""
+        if not in_system:
+            if directive == "FROM" and len(parts) == 2:
+                from_model = parts[1]
+            elif directive == "TOKEN_NAME" and len(parts) == 2:
+                token_name = parts[1]
+            elif directive == "SYSTEM" and len(parts) == 2 and parts[1].startswith('"""'):
+                rest = parts[1][3:]
+                if rest.endswith('"""'):
+                    system_lines.append(rest[:-3])
+                else:
+                    in_system = True
+                    if rest:
+                        system_lines.append(rest)
+            elif directive == "PARAMETER" and len(parts) == 2:
+                kv = parts[1].split(None, 1)
+                if len(kv) == 2:
+                    parameters[kv[0]] = kv[1]
+        else:
+            if stripped.endswith('"""'):
+                if stripped != '"""':
+                    system_lines.append(line.rstrip()[:-3])
                 in_system = False
             else:
                 system_lines.append(line)
-        elif stripped.upper().startswith("PARAMETER "):
-            parts = stripped[10:].split(None, 1)
-            if len(parts) == 2:
-                parameters[parts[0]] = parts[1]
 
     if from_model is None:
         raise ValueError("Missing FROM instruction in .per file")

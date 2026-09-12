@@ -30,6 +30,8 @@ class BotInstance(discord.Client):
     async def on_message(self, message: discord.Message):
         if message.author == self.user:
             return
+        if message.author.bot:
+            return
         guild_id = str(message.guild.id) if message.guild else None
         if self._config.allowed_guilds and guild_id not in self._config.allowed_guilds:
             return
@@ -38,7 +40,8 @@ class BotInstance(discord.Client):
             return
         persona = self._router.route(channel_id)
         if persona is None:
-            await message.channel.send(self._config.default_reject_message)
+            if self.user in message.mentions:
+                await message.channel.send(self._config.default_reject_message)
             return
         if persona not in self._personas:
             print(f"[proxima] channel {channel_id} routed to '{persona}' but this instance owns {set(self._personas)} — skipping")
@@ -68,7 +71,8 @@ class BotInstance(discord.Client):
             prompt_content=prompt_content,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
-        await message.channel.send(response)
+        for i in range(0, len(response), 2000):
+            await message.channel.send(response[i:i + 2000])
 
     async def on_message_delete(self, message: discord.Message):
         await self._db.mark_deleted(str(message.id))
@@ -80,7 +84,7 @@ class BotInstance(discord.Client):
 async def run() -> None:
     config = load_config()
     db = await Database.create()
-    ollama = OllamaClient()
+    ollama = OllamaClient(host=config.ollama_host)
     await ollama.health_check()
     router = Router(config)
 
@@ -103,7 +107,7 @@ async def run() -> None:
     for name, pf in all_personas.items():
         token_key = config.persona_tokens.get(name)
         if token_key:
-            env_var = f"PROXIMA_TOKEN_{token_key.upper()}"
+            env_var = f"PROXIMA_TOKEN_{token_key.upper().replace('-', '_')}"
             token = os.environ.get(env_var)
             if not token:
                 raise RuntimeError(f"Expected env var {env_var} for persona '{name}'")

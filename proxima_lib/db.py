@@ -31,6 +31,7 @@ class Database:
     async def create(cls) -> "Database":
         path = data_dir() / "messages.db"
         conn = await aiosqlite.connect(path)
+        await conn.execute("PRAGMA journal_mode=WAL")
         await conn.execute(CREATE_TABLE)
         await conn.commit()
         try:

@@ -15,5 +15,6 @@ class OllamaClient:
             ) from e
 
     async def generate(self, model: str, user_message: str, system: str | None = None) -> str:
-        response = await self._client.generate(model=model, prompt=user_message, system=system)
+        wrapped = f"[USER]\n{user_message}\n[/USER]"
+        response = await self._client.generate(model=model, prompt=wrapped, system=system)
         return response.response

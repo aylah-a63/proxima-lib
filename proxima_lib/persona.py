@@ -18,12 +18,12 @@ class PersonaFile:
     token_name: str | None = None
 
 
-def parse_per_file(path: Path) -> PersonaFile:
-    text = path.read_text(encoding="utf-8")
+def _parse_text(name: str, text: str) -> PersonaFile:
     from_model = None
     token_name = None
     system_lines: list[str] = []
     parameters: dict[str, str] = {}
+    system_count = 0
 
     in_system = False
     for line in text.splitlines():
@@ -36,6 +36,9 @@ def parse_per_file(path: Path) -> PersonaFile:
             elif directive == "TOKEN_NAME" and len(parts) == 2:
                 token_name = parts[1]
             elif directive == "SYSTEM" and len(parts) == 2 and parts[1].startswith('"""'):
+                system_count += 1
+                if system_count > 1:
+                    raise ValueError("Multiple SYSTEM blocks in .per file — possible injection attempt")
                 rest = parts[1][3:]
                 if rest.endswith('"""'):
                     system_lines.append(rest[:-3])
@@ -59,12 +62,29 @@ def parse_per_file(path: Path) -> PersonaFile:
         raise ValueError("Missing FROM instruction in .per file")
 
     return PersonaFile(
-        name=path.stem,
+        name=name,
         from_model=from_model,
         system_prompt="\n".join(system_lines).strip(),
         parameters=parameters,
         token_name=token_name,
     )
+
+
+def parse_per_file(path: Path) -> PersonaFile:
+    """Load and parse an encrypted .per file. Rejects plaintext."""
+    from proxima_lib.crypto import decrypt_per, MAGIC
+    raw = path.read_bytes()
+    if raw[:4] != MAGIC:
+        raise ValueError(
+            f"{path.name}: not encrypted — run `python -m proxima_lib encrypt {path}`"
+        )
+    text = decrypt_per(raw).decode("utf-8")
+    return _parse_text(path.stem, text)
+
+
+def parse_per_plaintext(path: Path) -> PersonaFile:
+    """Parse a plaintext .per file. Only for use by the encrypt command."""
+    return _parse_text(path.stem, path.read_text(encoding="utf-8"))
 
 
 def validate_safety_block(system_prompt: str) -> bool:
